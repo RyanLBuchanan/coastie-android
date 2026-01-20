@@ -13,13 +13,14 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -30,15 +31,19 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import ai.adaskids.coastie.data.CoastieApi
+import ai.adaskids.coastie.ui.AppState
 import ai.adaskids.coastie.ui.chat.ChatScreen
 import ai.adaskids.coastie.ui.chat.ChatViewModel
+import ai.adaskids.coastie.ui.scenarios.PromptEditorScreen
+import ai.adaskids.coastie.ui.theme.CoastieTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ai.adaskids.coastie.ui.theme.CoastieTheme { CoastieApp() }
-
+            CoastieTheme {
+                CoastieApp()
+            }
         }
     }
 }
@@ -63,12 +68,17 @@ sealed class Screen(
     data object History : Screen("history", "History", {
         Icon(Icons.Filled.History, contentDescription = "History")
     })
+
+    // Internal route (not shown in bottom nav)
+    data object PromptEditor : Screen("prompt_editor", "Prompt", { })
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CoastieApp() {
     val navController = rememberNavController()
+    val appState = remember { AppState() }
+
     val tabs = listOf(Screen.Scenarios, Screen.Chat, Screen.Exports, Screen.History)
 
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -104,20 +114,36 @@ fun CoastieApp() {
         ) {
             composable(Screen.Scenarios.route) {
                 ai.adaskids.coastie.ui.scenarios.ScenariosScreen(
-                    onPickScenario = { scenario ->
-                        // v1: just jump to Chat tab; next step we prefill the prompt
-                        navController.navigate(Screen.Chat.route)
-                    }
+                    appState = appState,
+                    onGoEdit = { navController.navigate(Screen.PromptEditor.route) }
                 )
             }
 
+            composable(Screen.PromptEditor.route) {
+                PromptEditorScreen(
+                    appState = appState,
+                    onRun = {
+                        // Jump to Chat; Chat will prefill from pending prompt
+                        navController.navigate(Screen.Chat.route)
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
 
             composable(Screen.Chat.route) {
-                // TODO: Replace with your real Netlify URL
                 val api = remember {
                     CoastieApi("https://adaskids-preview.netlify.app/.netlify/functions/coastie-chat")
                 }
                 val vm = remember { ChatViewModel(api) }
+
+                val pending by appState.pending.collectAsState()
+                LaunchedEffect(pending) {
+                    pending?.let {
+                        vm.setInput(it.prompt)
+                        appState.clearPending()
+                    }
+                }
+
                 ChatScreen(vm)
             }
 

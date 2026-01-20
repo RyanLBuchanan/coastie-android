@@ -2,21 +2,54 @@ package ai.adaskids.coastie.ui.scenarios
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ai.adaskids.coastie.ui.AppState
+import ai.adaskids.coastie.ui.PendingPrompt
+
+enum class Scenario {
+    Accessibility,
+    AIResilientAssessment,
+    RubricIntegrity
+}
+
+private data class ScenarioCard(
+    val scenario: Scenario,
+    val title: String,
+    val subtitle: String
+)
 
 @Composable
 fun ScenariosScreen(
-    onPickScenario: (Scenario) -> Unit
+    appState: AppState,
+    onGoEdit: () -> Unit
 ) {
-    // Background gradient + soft blobs (native approximation of your web backdrop)
+    val cards = listOf(
+        ScenarioCard(
+            scenario = Scenario.Accessibility,
+            title = "Make a Canvas page accessible",
+            subtitle = "Check headings, alt text, links, contrast, and structure."
+        ),
+        ScenarioCard(
+            scenario = Scenario.AIResilientAssessment,
+            title = "Convert a quiz to AI-resilient assessment",
+            subtitle = "Shift toward authentic tasks, reasoning, and process evidence."
+        ),
+        ScenarioCard(
+            scenario = Scenario.RubricIntegrity,
+            title = "Build a rubric + integrity note",
+            subtitle = "Create criteria, performance levels, and a student-facing integrity statement."
+        )
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -31,56 +64,100 @@ fun ScenariosScreen(
             )
             .padding(16.dp)
     ) {
-        Column(
+        LazyColumn(
             modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // HERO
+            item {
+                HeroCard()
+            }
 
-            HeroCard()
+            // SECTION HEADER
+            item {
+                Text(
+                    text = "Quick scenarios",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
 
-            Text(
-                text = "Quick scenarios",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
+            // SCENARIO CARDS
+            items(cards) { card ->
+                ScenarioButton(
+                    title = card.title,
+                    subtitle = card.subtitle,
+                    onClick = {
+                        val (title, prompt) = scenarioPrompt(card.scenario)
+                        appState.setPending(
+                            PendingPrompt(
+                                scenario = card.scenario,
+                                title = title,
+                                prompt = prompt
+                            )
+                        )
+                        onGoEdit()
+                    }
+                )
+            }
 
-            ScenarioButton(
-                title = "Make a Canvas page accessible",
-                subtitle = "Check headings, alt text, links, contrast, and structure.",
-                onClick = { onPickScenario(Scenario.Accessibility) }
-            )
-
-            ScenarioButton(
-                title = "Convert a quiz to AI-resilient assessment",
-                subtitle = "Shift toward authentic tasks, reasoning, and process evidence.",
-                onClick = { onPickScenario(Scenario.AIResilientAssessment) }
-            )
-
-            ScenarioButton(
-                title = "Build a rubric + integrity note",
-                subtitle = "Create criteria + performance levels + a student-facing integrity statement.",
-                onClick = { onPickScenario(Scenario.RubricIntegrity) }
-            )
-
-            Spacer(Modifier.height(6.dp))
-
-            AssistChip(
-                onClick = { /* later: show policy */ },
-                label = { Text("Integrity-first: Coastie won’t complete graded work for students.") }
-            )
+            // INTEGRITY CHIP
+            item {
+                AssistChip(
+                    onClick = { },
+                    label = { Text("Integrity-first: Coastie will not complete graded work for students.") }
+                )
+            }
         }
     }
 }
 
+private fun scenarioPrompt(s: Scenario): Pair<String, String> =
+    when (s) {
+        Scenario.Accessibility ->
+            "Make a Canvas page accessible" to
+                    """
+                I’m working on a Canvas page for COASTAL. Please help me improve accessibility and clarity.
+
+                1) Provide an accessibility checklist.
+                2) Identify issues with headings, links, alt text, contrast, and structure.
+                3) Suggest Canvas-friendly corrections.
+
+                Content (paste below):
+                """.trimIndent()
+
+        Scenario.AIResilientAssessment ->
+            "Convert a quiz to AI-resilient assessment" to
+                    """
+                I have a quiz or assessment that may be vulnerable to AI-assisted completion.
+
+                1) Identify vulnerabilities.
+                2) Propose an AI-resilient redesign emphasizing reasoning and authenticity.
+                3) Include a student-facing integrity note.
+
+                Assessment (paste below):
+                """.trimIndent()
+
+        Scenario.RubricIntegrity ->
+            "Build a rubric + integrity note" to
+                    """
+                Please create a rubric and an integrity note for this assignment.
+
+                1) Rubric criteria with performance levels.
+                2) Guidance for student success.
+                3) Ethical AI use note.
+
+                Assignment description (paste below):
+                """.trimIndent()
+    }
+
 @Composable
 private fun HeroCard() {
-    val glass = Color(0xCCFFFFFF) // translucent “glass”
-    val border = Color(0x66FFFFFF)
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = glass),
+        colors = CardDefaults.cardColors(containerColor = Color(0xCCFFFFFF)),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
@@ -91,18 +168,13 @@ private fun HeroCard() {
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF0B1220)),
+                        .background(Color(0xFF0B1220), RoundedCornerShape(16.dp)),
+                    contentAlignment = androidx.compose.ui.Alignment.Center
                 ) {
-                    // simple logo placeholder (matches your 🌊 vibe)
-                    Text(
-                        text = "🌊",
-                        modifier = Modifier.padding(start = 10.dp, top = 8.dp),
-                        style = MaterialTheme.typography.titleLarge
-                    )
+                    Text("🌊", style = MaterialTheme.typography.titleLarge)
                 }
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column {
                     Text(
                         text = "Coastal CTL Assistant",
                         style = MaterialTheme.typography.labelSmall,
@@ -110,14 +182,14 @@ private fun HeroCard() {
                     )
                     Text(
                         text = "Make course design feel as smooth as the shoreline.",
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
             }
 
             Text(
-                text = "Coastie guides educators with ethical, student-first AI support. Build clearer Canvas pages, resilient assessments, and feedback that nurtures academic integrity.",
+                text = "Coastie supports ethical, student-first AI use for Canvas design, assessment resilience, and academic integrity.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -126,35 +198,22 @@ private fun HeroCard() {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                FeatureTile("Canvas clarity", "Accessible pages")
-                FeatureTile("Assessment design", "AI-resilient tasks")
-                FeatureTile("Ethics coaching", "Student growth")
-            }
-
-            // “Live demo” pill like your web header
-            Surface(
-                color = Color(0xFF0B1220),
-                contentColor = Color.White,
-                shape = RoundedCornerShape(999.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("●", color = Color(0xFF24B0B8), fontWeight = FontWeight.Black)
-                    Text("CTL demonstration agent", style = MaterialTheme.typography.labelMedium)
-                }
+                FeatureTile("Canvas clarity", "Accessible pages", Modifier.weight(1f))
+                FeatureTile("Assessment design", "AI-resilient tasks", Modifier.weight(1f))
+                FeatureTile("Ethics coaching", "Student growth", Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-private fun FeatureTile(label: String, value: String) {
+private fun FeatureTile(
+    label: String,
+    value: String,
+    modifier: Modifier
+) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(4.dp),
+        modifier = modifier.padding(4.dp),
         shape = RoundedCornerShape(18.dp),
         color = Color(0xBFFFFFFF),
         tonalElevation = 1.dp
@@ -175,7 +234,11 @@ private fun FeatureTile(label: String, value: String) {
 }
 
 @Composable
-private fun ScenarioButton(title: String, subtitle: String, onClick: () -> Unit) {
+private fun ScenarioButton(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
     ElevatedCard(
         onClick = onClick,
         shape = RoundedCornerShape(22.dp),
@@ -188,10 +251,4 @@ private fun ScenarioButton(title: String, subtitle: String, onClick: () -> Unit)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
-}
-
-enum class Scenario {
-    Accessibility,
-    AIResilientAssessment,
-    RubricIntegrity
 }
