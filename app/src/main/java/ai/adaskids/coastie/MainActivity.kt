@@ -18,11 +18,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -41,9 +37,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            CoastieTheme {
-                CoastieApp()
-            }
+            CoastieTheme { CoastieApp() }
         }
     }
 }
@@ -69,7 +63,7 @@ sealed class Screen(
         Icon(Icons.Filled.History, contentDescription = "History")
     })
 
-    // Internal route (not shown in bottom nav)
+    // Internal route (not in bottom nav)
     data object PromptEditor : Screen("prompt_editor", "Prompt", { })
 }
 
@@ -93,9 +87,7 @@ fun CoastieApp() {
                         selected = currentRoute == screen.route,
                         onClick = {
                             navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
@@ -123,8 +115,11 @@ fun CoastieApp() {
                 PromptEditorScreen(
                     appState = appState,
                     onRun = {
-                        // Jump to Chat; Chat will prefill from pending prompt
-                        navController.navigate(Screen.Chat.route)
+                        // Force move to Chat and remove PromptEditor from back stack
+                        navController.navigate(Screen.Chat.route) {
+                            popUpTo(Screen.PromptEditor.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     },
                     onBack = { navController.popBackStack() }
                 )
@@ -136,11 +131,14 @@ fun CoastieApp() {
                 }
                 val vm = remember { ChatViewModel(api) }
 
+                // Prefill chat input from pending scenario prompt
                 val pending by appState.pending.collectAsState()
                 LaunchedEffect(pending) {
                     pending?.let {
                         vm.setInput(it.prompt)
-                        appState.clearPending()
+                        // Leave it in place for now (so you can go back and still have context)
+                        // If you prefer, uncomment:
+                        // appState.clearPending()
                     }
                 }
 
@@ -160,10 +158,7 @@ fun CoastieApp() {
 
 @Composable
 private fun Placeholder(label: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(label)
     }
 }
