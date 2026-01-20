@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -28,12 +29,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import ai.adaskids.coastie.data.CoastieApi
+import ai.adaskids.coastie.ui.chat.ChatScreen
+import ai.adaskids.coastie.ui.chat.ChatViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme { CoastieApp() }
+            MaterialTheme {
+                CoastieApp()
+            }
         }
     }
 }
@@ -46,12 +52,15 @@ sealed class Screen(
     data object Scenarios : Screen("scenarios", "Scenarios", {
         Icon(Icons.Filled.ListAlt, contentDescription = "Scenarios")
     })
+
     data object Chat : Screen("chat", "Chat", {
         Icon(Icons.Filled.ChatBubbleOutline, contentDescription = "Chat")
     })
+
     data object Exports : Screen("exports", "Exports", {
         Icon(Icons.Filled.FolderOpen, contentDescription = "Exports")
     })
+
     data object History : Screen("history", "History", {
         Icon(Icons.Filled.History, contentDescription = "History")
     })
@@ -63,8 +72,8 @@ fun CoastieApp() {
     val navController = rememberNavController()
     val tabs = listOf(Screen.Scenarios, Screen.Chat, Screen.Exports, Screen.History)
 
-    val backStack by navController.currentBackStackEntryAsState()
-    val currentRoute = backStack?.destination?.route ?: Screen.Scenarios.route
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route ?: Screen.Scenarios.route
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Coastie") }) },
@@ -75,7 +84,9 @@ fun CoastieApp() {
                         selected = currentRoute == screen.route,
                         onClick = {
                             navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
                                 launchSingleTop = true
                                 restoreState = true
                             }
@@ -86,23 +97,42 @@ fun CoastieApp() {
                 }
             }
         }
-    ) { padding ->
+    ) { paddingValues ->
         NavHost(
             navController = navController,
             startDestination = Screen.Scenarios.route,
-            modifier = Modifier.padding(padding)
+            modifier = Modifier.padding(paddingValues)
         ) {
-            composable(Screen.Scenarios.route) { Placeholder("Scenario Picker") }
-            composable(Screen.Chat.route) { Placeholder("Chat (backend next)") }
-            composable(Screen.Exports.route) { Placeholder("Exports (next)") }
-            composable(Screen.History.route) { Placeholder("History (next)") }
+            composable(Screen.Scenarios.route) {
+                Placeholder("Scenario Picker")
+            }
+
+            composable(Screen.Chat.route) {
+                // TODO: Replace with your real Netlify URL
+                val api = remember {
+                    CoastieApi("https://adaskids-preview.netlify.app/.netlify/functions/coastie-chat")
+                }
+                val vm = remember { ChatViewModel(api) }
+                ChatScreen(vm)
+            }
+
+            composable(Screen.Exports.route) {
+                Placeholder("Exports (next)")
+            }
+
+            composable(Screen.History.route) {
+                Placeholder("History (next)")
+            }
         }
     }
 }
 
 @Composable
 private fun Placeholder(label: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
         Text(label)
     }
 }
