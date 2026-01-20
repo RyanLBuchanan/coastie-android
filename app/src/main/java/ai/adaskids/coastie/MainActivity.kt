@@ -37,9 +37,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
-                CoastieApp()
-            }
+            ai.adaskids.coastie.ui.theme.CoastieTheme { CoastieApp() }
+
         }
     }
 }
@@ -104,8 +103,14 @@ fun CoastieApp() {
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(Screen.Scenarios.route) {
-                Placeholder("Scenario Picker")
+                ai.adaskids.coastie.ui.scenarios.ScenariosScreen(
+                    onPickScenario = { scenario ->
+                        // v1: just jump to Chat tab; next step we prefill the prompt
+                        navController.navigate(Screen.Chat.route)
+                    }
+                )
             }
+
 
             composable(Screen.Chat.route) {
                 // TODO: Replace with your real Netlify URL
