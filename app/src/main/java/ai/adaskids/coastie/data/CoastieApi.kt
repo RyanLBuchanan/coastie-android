@@ -1,9 +1,10 @@
 package ai.adaskids.coastie.data
 
+import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 data class ChatResult(
     val reply: String? = null,
@@ -12,10 +13,16 @@ data class ChatResult(
 
 class CoastieApi(private val baseUrl: String) {
 
-    private val client = OkHttpClient()
+    // Increase timeouts so long responses don't fail early.
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)   // allow Coastie to “think”
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
+
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
-    fun chatJson(message: String): ChatResult {
+    fun chatJsonAsync(message: String, callback: (ChatResult) -> Unit) {
         val safeMsg = message
             .replace("\\", "\\\\")
             .replace("\"", "\\\"")
@@ -29,23 +36,30 @@ class CoastieApi(private val baseUrl: String) {
             .post(body)
             .build()
 
-        client.newCall(request).execute().use { resp ->
-            val text = resp.body?.string().orEmpty()
-
-            if (!resp.isSuccessful) {
-                return ChatResult(error = "HTTP ${resp.code}: $text")
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                callback(ChatResult(error = e.message ?: "Network error"))
             }
 
-            // Expected: {"reply":"..."}  (fallback to raw text if it doesn't match)
-            val reply = Regex(""""reply"\s*:\s*"((?:\\.|[^"\\])*)"""")
-                .find(text)
-                ?.groupValues
-                ?.getOrNull(1)
-                ?.replace("\\n", "\n")
-                ?.replace("\\\"", "\"")
-                ?.replace("\\\\", "\\")
+            override fun onResponse(call: Call, response: Response) {
+                response.use {
+                    val text = it.body?.string().orEmpty()
+                    if (!it.isSuccessful) {
+                        callback(ChatResult(error = "HTTP ${it.code}: $text"))
+                        return
+                    }
 
-            return ChatResult(reply = reply ?: text)
-        }
+                    val reply = Regex(""""reply"\s*:\s*"((?:\\.|[^"\\])*)"""")
+                        .find(text)
+                        ?.groupValues
+                        ?.getOrNull(1)
+                        ?.replace("\\n", "\n")
+                        ?.replace("\\\"", "\"")
+                        ?.replace("\\\\", "\\")
+
+                    callback(ChatResult(reply = reply ?: text))
+                }
+            }
+        })
     }
 }

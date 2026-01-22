@@ -1,13 +1,9 @@
 package ai.adaskids.coastie.ui.chat
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import ai.adaskids.coastie.data.CoastieApi
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 data class ChatUiState(
     val input: String = "",
@@ -43,18 +39,14 @@ class ChatViewModel(
             messages = _state.value.messages + ChatMessage("user", msg)
         )
 
-        viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                api.chatJson(msg)
-            }
-
+        api.chatJsonAsync(msg) { result ->
             val replyText = result.reply?.trim().orEmpty()
 
             _state.value = _state.value.copy(
                 isLoading = false,
                 messages = _state.value.messages + ChatMessage(
-                    "assistant",
-                    if (replyText.isNotEmpty()) replyText else "[No reply]"
+                    role = "assistant",
+                    text = if (replyText.isNotEmpty()) replyText else "[No reply]"
                 ),
                 error = result.error
             )
