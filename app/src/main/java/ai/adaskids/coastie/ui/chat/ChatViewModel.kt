@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import ai.adaskids.coastie.data.CoastieApi
+import ai.adaskids.coastie.ui.ExportStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -70,11 +71,16 @@ class ChatViewModel(
         if (attachment == null) {
             api.chatJsonAsync(msg) { result ->
                 val replyText = result.reply?.trim().orEmpty()
+                val finalReply = if (replyText.isNotEmpty()) replyText else "[No reply]"
+
+                // Update shared export state for Exports tab
+                ExportStore.update(lastUserPrompt = msg, lastAssistantReply = finalReply)
+
                 _state.value = _state.value.copy(
                     isLoading = false,
                     messages = _state.value.messages + ChatMessage(
                         role = "assistant",
-                        text = if (replyText.isNotEmpty()) replyText else "[No reply]"
+                        text = finalReply
                     ),
                     error = result.error
                 )
@@ -88,13 +94,18 @@ class ChatViewModel(
                 mimeType = attachment.mimeType
             ) { result ->
                 val replyText = result.reply?.trim().orEmpty()
+                val finalReply = if (replyText.isNotEmpty()) replyText else "[No reply]"
+
+                // Update shared export state for Exports tab
+                ExportStore.update(lastUserPrompt = msg, lastAssistantReply = finalReply)
+
                 _state.value = _state.value.copy(
                     isLoading = false,
-                    // Clear attachment after successful send attempt (even if server error returns)
+                    // Clear attachment after send attempt
                     attachment = null,
                     messages = _state.value.messages + ChatMessage(
                         role = "assistant",
-                        text = if (replyText.isNotEmpty()) replyText else "[No reply]"
+                        text = finalReply
                     ),
                     error = result.error
                 )

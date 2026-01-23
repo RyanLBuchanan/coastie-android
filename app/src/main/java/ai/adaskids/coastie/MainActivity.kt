@@ -32,6 +32,7 @@ import ai.adaskids.coastie.data.CoastieApi
 import ai.adaskids.coastie.ui.AppState
 import ai.adaskids.coastie.ui.chat.ChatScreen
 import ai.adaskids.coastie.ui.chat.ChatViewModel
+import ai.adaskids.coastie.ui.exports.ExportsScreen
 import ai.adaskids.coastie.ui.scenarios.PromptEditorScreen
 import ai.adaskids.coastie.ui.theme.CoastieTheme
 
@@ -148,7 +149,7 @@ fun CoastieApp() {
             }
 
             composable(Screen.Exports.route) {
-                Placeholder("Exports (next)")
+                ExportsScreen()
             }
 
             composable(Screen.History.route) {
