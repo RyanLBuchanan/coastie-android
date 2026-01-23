@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.FolderOpen
@@ -18,23 +17,27 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import ai.adaskids.coastie.data.CoastieApi
+import ai.adaskids.coastie.data.local.HistoryRepository
+import ai.adaskids.coastie.data.local.db.CoastieDatabase
 import ai.adaskids.coastie.ui.AppState
 import ai.adaskids.coastie.ui.chat.ChatScreen
 import ai.adaskids.coastie.ui.chat.ChatViewModel
 import ai.adaskids.coastie.ui.exports.ExportsScreen
+import ai.adaskids.coastie.ui.history.HistoryScreen
+import ai.adaskids.coastie.ui.history.HistoryViewModel
 import ai.adaskids.coastie.ui.scenarios.PromptEditorScreen
 import ai.adaskids.coastie.ui.theme.CoastieTheme
+import androidx.compose.foundation.layout.padding
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,7 +69,6 @@ sealed class Screen(
         Icon(Icons.Filled.History, contentDescription = "History")
     })
 
-    // Internal route (not in bottom nav)
     data object PromptEditor : Screen("prompt_editor", "Prompt", { })
 }
 
@@ -75,6 +77,11 @@ sealed class Screen(
 fun CoastieApp() {
     val navController = rememberNavController()
     val appState = remember { AppState() }
+    val ctx = LocalContext.current
+
+    // Room + repo (singletons for demo)
+    val db = remember { CoastieDatabase.get(ctx) }
+    val historyRepo = remember { HistoryRepository(db.historyDao()) }
 
     val tabs = listOf(Screen.Scenarios, Screen.Chat, Screen.Exports, Screen.History)
 
@@ -105,7 +112,9 @@ fun CoastieApp() {
         NavHost(
             navController = navController,
             startDestination = Screen.Scenarios.route,
-            modifier = androidx.compose.ui.Modifier.padding(paddingValues)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
         ) {
             composable(Screen.Scenarios.route) {
                 ai.adaskids.coastie.ui.scenarios.ScenariosScreen(
@@ -118,7 +127,6 @@ fun CoastieApp() {
                 PromptEditorScreen(
                     appState = appState,
                     onRun = {
-                        // Force move to Chat and remove PromptEditor from back stack
                         navController.navigate(Screen.Chat.route) {
                             popUpTo(Screen.PromptEditor.route) { inclusive = true }
                             launchSingleTop = true
@@ -132,16 +140,14 @@ fun CoastieApp() {
                 val api = remember {
                     CoastieApi("https://adaskids-preview.netlify.app/.netlify/functions/coastie-chat")
                 }
-                val vm = remember { ChatViewModel(api) }
+                val vm = remember { ChatViewModel(api, historyRepo) }
 
-                // Prefill chat input from pending scenario prompt
+                // Prefill chat input from pending scenario prompt (if any)
                 val pending by appState.pending.collectAsState()
                 LaunchedEffect(pending) {
                     pending?.let {
                         vm.setInput(it.prompt)
-                        // Leave it in place for now (so you can go back and still have context)
-                        // If you prefer, uncomment:
-                        // appState.clearPending()
+                        vm.setScenarioTitle(it.title) // captures scenario title into History entries
                     }
                 }
 
@@ -153,7 +159,8 @@ fun CoastieApp() {
             }
 
             composable(Screen.History.route) {
-                Placeholder("History (next)")
+                val vm = remember { HistoryViewModel(historyRepo) }
+                HistoryScreen(vm)
             }
         }
     }
@@ -161,7 +168,7 @@ fun CoastieApp() {
 
 @Composable
 private fun Placeholder(label: String) {
-    Box(modifier = androidx.compose.ui.Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(label)
     }
 }

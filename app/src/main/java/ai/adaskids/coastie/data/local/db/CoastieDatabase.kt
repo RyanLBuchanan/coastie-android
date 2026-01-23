@@ -1,10 +1,11 @@
-// file: data/local/db/CoastieDatabase.kt
-package com.coastal.coastie.data.local.db
+package ai.adaskids.coastie.data.local.db
 
+import android.content.Context
 import androidx.room.Database
+import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.coastal.coastie.data.local.dao.HistoryDao
-import com.coastal.coastie.data.local.entity.HistoryEntryEntity
+import ai.adaskids.coastie.data.local.dao.HistoryDao
+import ai.adaskids.coastie.data.local.entity.HistoryEntryEntity
 
 @Database(
     entities = [HistoryEntryEntity::class],
@@ -13,4 +14,22 @@ import com.coastal.coastie.data.local.entity.HistoryEntryEntity
 )
 abstract class CoastieDatabase : RoomDatabase() {
     abstract fun historyDao(): HistoryDao
+
+    companion object {
+        @Volatile private var INSTANCE: CoastieDatabase? = null
+
+        fun get(context: Context): CoastieDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    CoastieDatabase::class.java,
+                    "coastie_demo.db"
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
 }
