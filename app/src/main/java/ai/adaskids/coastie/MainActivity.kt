@@ -18,9 +18,11 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -102,7 +104,7 @@ fun CoastieApp() {
         NavHost(
             navController = navController,
             startDestination = Screen.Scenarios.route,
-            modifier = Modifier.padding(paddingValues)
+            modifier = androidx.compose.ui.Modifier.padding(paddingValues)
         ) {
             composable(Screen.Scenarios.route) {
                 ai.adaskids.coastie.ui.scenarios.ScenariosScreen(
@@ -158,7 +160,7 @@ fun CoastieApp() {
 
 @Composable
 private fun Placeholder(label: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(modifier = androidx.compose.ui.Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
         Text(label)
     }
 }
