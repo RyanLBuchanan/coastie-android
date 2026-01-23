@@ -4,8 +4,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -18,7 +21,7 @@ import kotlinx.coroutines.launch
 private enum class ExportFormat(val label: String) {
     Plain("Plain text"),
     CanvasHtml("Canvas-ready HTML"),
-    Announcement("Announcement text")
+    Announcement("Announcement")
 }
 
 @Composable
@@ -30,6 +33,7 @@ fun ExportsScreen() {
     val prompt = exportState.lastUserPrompt?.trim().orEmpty()
 
     var format by remember { mutableStateOf(ExportFormat.Plain) }
+
     val snack = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -42,13 +46,62 @@ fun ExportsScreen() {
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snack) }
+        snackbarHost = { SnackbarHost(snack) },
+        bottomBar = {
+            // Sticky actions: always visible for demo impact
+            Surface(tonalElevation = 2.dp) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Button(
+                            onClick = {
+                                if (reply.isBlank()) {
+                                    scope.launch { snack.showSnackbar("Nothing to copy yet. Send a chat first.") }
+                                } else {
+                                    copyToClipboard(ctx, exportText)
+                                    scope.launch { snack.showSnackbar("Copied to clipboard") }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp)
+                        ) { Text("Copy") }
+
+                        OutlinedButton(
+                            onClick = {
+                                if (reply.isBlank()) {
+                                    scope.launch { snack.showSnackbar("Nothing to share yet. Send a chat first.") }
+                                } else {
+                                    shareText(ctx, exportText, subject = "Coastie Export")
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp)
+                        ) { Text("Share") }
+                    }
+
+                    Text(
+                        text = "Powered by Microsoft Azure AI Foundry • Inputs are not used to train public models • Do not include student PII",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     ) { padding ->
+        val pageScroll = rememberScrollState()
         Column(
             modifier = Modifier
                 .padding(padding)
                 .padding(16.dp)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .verticalScroll(pageScroll),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
@@ -58,14 +111,15 @@ fun ExportsScreen() {
             )
 
             Text(
-                text = "Export content from the most recent Coastie reply. (Demo-first: no history persistence here.)",
+                text = "Export content from the most recent Coastie reply. (Demo-first: in-memory only.)",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            // If nothing to export yet, show a friendly empty state
             if (reply.isBlank()) {
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(18.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -76,18 +130,19 @@ fun ExportsScreen() {
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "Go to Chat, send a message, then come back here to copy/share the result.",
+                            text = "Go to Chat, send a message, then return here to copy/share it.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
+                Spacer(Modifier.height(12.dp))
                 return@Column
             }
 
             // Format picker
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -96,9 +151,14 @@ fun ExportsScreen() {
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(10.dp))
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         ExportChip(
                             selected = format == ExportFormat.Plain,
                             label = ExportFormat.Plain.label,
@@ -118,55 +178,51 @@ fun ExportsScreen() {
                 }
             }
 
-            // Preview
+            // Preview (fixed height + internal scroll so it doesn’t push buttons off-screen)
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier
-                        .padding(14.dp)
-                        .fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Text(
                         text = "Preview",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )
+                    Spacer(Modifier.height(8.dp))
+
+                    val previewScroll = rememberScrollState()
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(320.dp) // tweakable; keeps action bar visible
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(12.dp)
+                                .verticalScroll(previewScroll)
+                        ) {
+                            Text(
+                                text = exportText,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
                     Text(
-                        text = exportText,
-                        style = MaterialTheme.typography.bodySmall
+                        text = "Tip: Choose “Canvas-ready HTML” when you want something you can paste into a Canvas page editor.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // Actions
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(
-                    onClick = {
-                        copyToClipboard(ctx, exportText)
-                        scope.launch { snack.showSnackbar("Copied to clipboard") }
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp)
-                ) { Text("Copy") }
-
-                OutlinedButton(
-                    onClick = {
-                        shareText(ctx, exportText, subject = "Coastie Export")
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp)
-                ) { Text("Share") }
-            }
-
-            Text(
-                text = "Powered by Microsoft Azure AI Foundry • Inputs are not used to train public models • Do not include student PII",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Add a little extra space above bottom bar so content doesn’t feel cramped
+            Spacer(Modifier.height(90.dp))
         }
     }
 }
@@ -191,8 +247,7 @@ private fun shareText(ctx: Context, text: String, subject: String) {
         putExtra(Intent.EXTRA_SUBJECT, subject)
         putExtra(Intent.EXTRA_TEXT, text)
     }
-    val chooser = Intent.createChooser(sendIntent, "Share export")
-    ctx.startActivity(chooser)
+    ctx.startActivity(Intent.createChooser(sendIntent, "Share export"))
 }
 
 private fun buildPlainExport(prompt: String, reply: String): String {
@@ -201,24 +256,23 @@ private fun buildPlainExport(prompt: String, reply: String): String {
 }
 
 private fun buildAnnouncementExport(prompt: String, reply: String): String {
-    // Demo-friendly heuristic: turn the reply into an instructor-facing announcement draft.
+    // Instructor-facing announcement draft (clean, short, stakeholder-friendly)
     return """
-Title: Course Update / Instructional Note
+Course Announcement (Draft)
 
-Context (from instructor):
-${prompt.ifBlank { "(No prompt captured)" }}
+Context:
+${prompt.ifBlank { "(No prompt captured.)" }}
 
-Draft announcement:
+Message:
 ${reply.trim()}
 
-Suggested closing:
-If you have questions or need accommodations, please reach out. We’re here to support you.
+Closing:
+If you have questions or need support, please reach out. The CTL team is happy to help.
 """.trim()
 }
 
 private fun buildCanvasHtmlExport(prompt: String, reply: String): String {
-    // Lightweight Canvas-ready HTML scaffold (simple + accessible, no heavy styling).
-    // Stakeholders will "get it" immediately.
+    // Lightweight Canvas-friendly HTML scaffold (simple + accessible).
     val safePrompt = escapeHtml(prompt.ifBlank { "Instructor request not captured." })
     val safeReply = escapeHtml(reply)
 
