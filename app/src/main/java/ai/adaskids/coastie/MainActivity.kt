@@ -37,7 +37,8 @@ import ai.adaskids.coastie.ui.history.HistoryScreen
 import ai.adaskids.coastie.ui.history.HistoryViewModel
 import ai.adaskids.coastie.ui.scenarios.PromptEditorScreen
 import ai.adaskids.coastie.ui.theme.CoastieTheme
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
